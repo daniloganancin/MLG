@@ -2,9 +2,6 @@
 title: "SME0823 - Modelos Lineares Generalizados - Lista 2"
 author: 
 - "Danilo Augusto Ganancin Faria -- Nº USP: 9609172" 
-- "Guilherme Milan Santos -- Nº USP: 9012966"
-- "Teh Led Red -- Nº USP: 10368927"
-- "Vinicius Henrique Valentim -- Nº USP: 10349432"
 date: "`r format(Sys.time(), '%d de %B de %Y')`"
 header-includes:
    - \usepackage{float}
