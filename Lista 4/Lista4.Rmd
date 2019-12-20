@@ -1,0 +1,522 @@
+---
+title: "SME0823 - Modelos Lineares Generalizados - Lista 4"
+author: 
+- "Danilo Augusto Ganancin Faria -- Nº USP: 9609172" 
+date: "`r format(Sys.time(), '%d de %B de %Y')`"
+header-includes:
+  - \usepackage{float}
+  - \usepackage{here}
+  - \usepackage[brazil]{babel}
+  - \usepackage{caption}
+  - \usepackage{color}
+  - \usepackage{mathtools}
+  - \usepackage{setspace}\onehalfspacing
+output:
+  pdf_document: 
+    highlight: default
+  fig_caption: yes
+  urlcolor: blue
+  linkcolor: blue
+  fontsize: 12pt
+  geometry: margin=0.75in
+fig_width: 10
+fig_height: 6
+---
+\newcommand{\mar}{\hspace{.3cm}}
+\newcommand{\ld}{\vspace{.15cm}}
+
+```{r setup, include=FALSE}
+# knitr::opts_chunk$set(cache = TRUE, message = FALSE, warning = FALSE, error = FALSE)
+knitr::opts_chunk$set(message = FALSE, warning = FALSE, error = FALSE, tidy = TRUE)
+```
+
+
+```{r, echo = FALSE, results = 'hide'}
+rm(list = ls())
+ls()
+```
+
+## Exercício 1
+
+\mar Os dados deste exercício correspondem a um experimento de dose-resposta conduzido para avaliar a influência do extrato vegetal ``aquoso frio de folhas'' na morte de um determinado tipo de mosquito.
+
+\mar Foram encontramos as seguintes variáves: $\mathtt{dose}$, mosquitos expostos ($\mathtt{n})$ e mosquitos mortos $(\mathtt{y})$, que é nossa variável reposta.
+
+```{r, include = FALSE}
+# Pacotes utilizados no decorrer das análises
+library(ggplot2)
+library(GGally)
+library(lattice)
+library(gridExtra)
+library(ggpubr)
+library(qqplotr)
+library(MASS)
+library(olsrr)
+library(base)
+library(xtable)
+library(gridExtra)
+library(Epi)
+library(hnp)
+library(ModelGood)
+library(pROC)
+library(plotROC)
+```
+
+\mar Para realizar a leitura dos dados utilizou-se o seguinte código.
+
+```{r, results = 'hide'}
+# Código para ler os dados
+dados <- scan("http://www.ime.usp.br/~giapaula/dose1.dat", what = list(dose = 0, 
+                                                                       n = 0, y = 0))
+```
+
+### Análise de dados preliminar
+
+\begin{table}[H]
+\centering
+\setlength{\tabcolsep}{6pt}
+\caption{Variáveis dose e n}
+\begin{tabular}{cc}
+\hline
+Variável & \\ \hline
+dose & 0 15 20 25 30 35 40 \\
+n & 50 50 50 50 50 50 50 \\ \hline
+\end{tabular}
+\label{tab:dados1}
+\end{table}
+
+\mar Nota-se na Tabela \ref{tab:dados1} que a $\mathtt{dose}$ iniciou em 0, depois teve um salto para 15 e em seguida teve um acréscimo de 5 em 5 até chegar no limite de 40 (unidades de medida). A quantidade de mosquitos utilizada neste experimento para cada dose foi constante igual a 50 mosquitos. 
+
+```{r, results = 'hide'}
+summary(dados$y)
+sd(dados$y)
+var(dados$y)
+
+# Cálculo da proporção de mosquitos mortos por dose
+prop <- (dados$y) / (dados$n)
+prop
+```
+
+\begin{table}[H]
+\centering
+\setlength{\tabcolsep}{6pt}
+\caption{Medidas resumo da variável resposta y}
+\begin{tabular}{cccccccc}
+\hline
+Variável & Min. & Med. & Máx. & Média & DP & Var. \\ \hline
+y & 4 & 29 & 47 & 25,43 & 17,73 & 314,29 \\ \hline
+\end{tabular}
+\label{tab:resy}
+\end{table}
+
+\mar De acordo com a Tabela \ref{tab:resy}, é possível observar que a quantidade média de mosquitos mortos é de aproximadamente 26, e também que o número mínimo e máximo de mortes provocadas pelo extrato vegetal ``aquoso frio de folhas'' são de 4 e 47 mosquitos, respectivamente.
+
+```{r, fig1, echo = FALSE, fig.align = "center", fig.cap = "Gráficos de pontos da proporção observada de mosquitos mortos por dose", fig.height = 3, fig.pos = 'H', fig.width = 5}
+dados <- data.frame(dados)
+prop <- data.frame(prop)
+
+g1 <- ggplot(prop, aes(x = dados$dose, y = prop)) + xlab("Dose") + ylab("Proporção de mortes") + 
+  ggtitle("") + geom_point() + theme_minimal() + theme(legend.position = "none",
+                                                       plot.title = element_text(hjust = 0.45)) 
+# + scale_y_continuous(labels = scales::percent_format())
+g1
+```
+
+\mar Pelo gráfico da Figura \ref{fig:fig1}, temos uma indicação de que o modelo logístico pode ser apropriado para realizar o ajuste do modelo linear generalizado.
+
+### Ajustes dos modelos lineares generalizados
+
+```{r, results = 'hide'}
+# Matriz X
+matX <- cbind(dados$y, dados$n - dados$y)
+matX
+```
+
+\mar Acima foi criado uma matriz intitulada $\mathtt{matX}$ em que sua primeira coluna contém o número de mosquitos mortos e a segunda o número de mosquitos sobreviventes em relação a cada uma das doses.
+
+\mar Por se tratar de um modelo com resposta binária, ou seja, que admite apenas dois resultados, ajustou-se o modelo supondo uma distribuição Binomial para $\mathtt{y}$.
+
+```{r, results = 'hide'}
+# Ajuste do modelo MLG com função de ligação logito
+fit.mod1 <- glm(matX ~ dados$dose, family = binomial(link = "logit"))
+
+# Ajuste do modelo MLG com função de ligação probito
+fit.mod2 <- glm(matX ~ dados$dose, family = binomial(link = "probit"))
+
+# Ajuste do modelo MLG com função de ligação cloglog
+fit.mod3 <- glm(matX ~ dados$dose, family = binomial(link = "cloglog"))
+
+# Ajuste do modelo MLG com função de ligação loglog
+loglog <- function()  structure(list(
+    linkfun = function(mu) -log(-log(mu)),
+    linkinv = function(eta)
+      pmax(pmin(exp(-exp(-eta)), 1 - .Machine$double.eps), .Machine$double.eps),
+    mu.eta = function(eta) {
+      eta <- pmin(eta, 700)
+      pmax(exp(-eta - exp(-eta)), .Machine$double.eps)
+    },
+    dmu.deta = function(eta)
+      pmax(exp(-exp(-eta) - eta) * expm1(-eta), .Machine$double.eps),
+    valideta = function(eta) TRUE,
+    name = "loglog"
+), class = "link-glm")
+
+fit.mod4 <- glm(matX ~ dados$dose, family = binomial(link = loglog()))
+
+# Ajuste do modelo MLG com função de ligação cauchito
+fit.mod5 <- glm(matX ~ dados$dose, family = binomial(link = "cauchit"))
+
+# Resumo das medidas dos modelos MLG ajustados
+summary(fit.mod1)
+summary(fit.mod2)
+summary(fit.mod3)
+summary(fit.mod4)
+summary(fit.mod5)
+
+# Data frame com a proporção observada e com os valores ajustados de cada modelo MLG 
+df <- data.frame(prop, round(fit.mod1$fitted.values, 2), round(fit.mod2$fitted.values, 2), 
+                 round(fit.mod3$fitted.values, 2), round(fit.mod4$fitted.values, 2), 
+                 round(fit.mod5$fitted.values, 2))
+colnames(df) = c("prop", "fit.mod1", "fit.mod2", "fit.mod3", "fit.mod4", "fit.mod5")
+df
+```
+
+```{r, fig2, echo = FALSE, fig.align = "center", fig.cap = "Gráficos de pontos e linhas da proporção observada de mosquitos mortos por dose de cada modelo ajustado", fig.height = 3, fig.pos = 'H', fig.width = 5}
+g2 <- ggplot(df, aes(x = dados$dose, y = dados$prop)) + 
+             geom_point(aes(y = df$prop, colour = "Prop"), group = 1) + 
+             geom_point(aes(y = df$fit.mod1, colour = "Logito"), group = 2) +
+             geom_point(aes(y = df$fit.mod2, colour = "Probito"), group = 3) +
+             geom_point(aes(y = df$fit.mod3, colour = "Cloglog"), group = 4) +
+             geom_point(aes(y = df$fit.mod4 , colour = "Loglog"), group = 5) +
+             geom_point(aes(y = df$fit.mod5, colour = "Cauchito"), group = 6) +
+  
+             geom_line(aes(y = df$prop, colour = "Prop"), group = 1) + 
+             geom_line(aes(y = df$fit.mod1, colour = "Logito"), group = 2) +
+             geom_line(aes(y = df$fit.mod2, colour = "Probito"), group = 3) +
+             geom_line(aes(y = df$fit.mod3, colour = "Cloglog"), group = 4) +
+             geom_line(aes(y = df$fit.mod4, colour = "Loglog"), group = 5) +
+             geom_line(aes(y = df$fit.mod5, colour = "Cauchito"), group = 6) +
+             xlab("Dose") + ylab("Proporção de mortes") +
+             theme(legend.position = "right", plot.title = element_text(hjust = 0.45)) +
+             scale_color_manual("Função de ligação", values = c("red", "darkgreen", "brown",
+                                                                "darkorange", "blue", "black")) +
+             theme_minimal() 
+g2
+```
+
+\mar Na Figura \ref{fig:fig2}, tem-se o gráfico de pontos e linhas da proporção de mortes observadas e dos valores ajustados de cada modelo com sua respectiva função de ligação.
+
+\mar O modelo com curva que melhor se aproxima do gráfico da proporção de mortes observadas, é o que utilizou como função de ligação a função $\mathtt{cauchito}$. Temos um indício de que este modelo seja o que melhor se ajusta aos dados dentre todos os outros ajustados.
+
+### Diagnóstico dos modelos ajustados
+
+ - AIC e desvio residual
+```{r, results = 'hide'}
+# Critério AIC para cada um dos MLG ajustados
+AIC(fit.mod1)
+AIC(fit.mod2)
+AIC(fit.mod3)
+AIC(fit.mod4)
+AIC(fit.mod5)
+```
+
+\begin{table}[H]
+\centering
+\setlength{\tabcolsep}{6pt}
+\caption{Critério AIC e desvio residual dos modelos MLG ajustados}
+\begin{tabular}{ccc}
+\hline
+Função de ligação & AIC & Desvio residual \\ \hline
+Logito & 40,10 & 10,18 \\
+Probito & 43,79 & 13,87 \\ 
+Cloglog & 39,84 & 9,93 \\ 
+Loglog & 58,31 & 28,39 \\
+Cauchito & 33,29 & 3,38\\ \hline
+\end{tabular}
+\label{tab:AIC}
+\end{table}
+
+\mar Uma das formas de se avaliar um modelo é calculando seu critério de informação de Akaike (AIC), sabe-se quanto menor é seu valor, melhor é o ajuste do modelo. Uma medida alternativa que pode ser usada para complementar o uso do AIC é o Desvio residual, quanto menor seu valor, melhor é o ajuste do modelo. De acordo com as medidas apresentadas na Tabela \ref{tab:AIC}, o melhor modelo ajustado é aquele em que utilizou-se como função de ligação a $\mathtt{cauchito}$.
+
+- Gráfico de envelope
+
+\mar Esta metodologia é utilizada com o intuito de verificar possíveis afastamentos das suposições feitas para o modelo, em especial para o componente aleatório e para a parte sistemática bem como a existência de observações discrepantes com alguma interferência desproporcional ou inferencial nos resultados dos ajustes.
+
+```{r, fig3, fig.align = "center", fig.cap = "Gráfico de envelope para o modelo com função de ligação logito", fig.height = 4, fig.width = 5, fig.pos = 'H'}
+# Envelope para o MLG com função de ligação logito
+ntot <- dados$n
+
+fit.model <- fit.mod1
+source("http://www.ime.usp.br/~giapaula/envelr_bino")
+``` 
+
+\mar Pode-se observar na Figura \ref{fig:fig3} que apenas uma observação está fora do envelope, neste caso, pode ser um indicativo de que o modelo não está totalmente bem ajustado.
+
+```{r, fig4, fig.align = "center", fig.cap = "Gráfico de envelope para o modelo com função de ligação probito", fig.height = 4, fig.width = 5, fig.pos = 'H'}
+# Envelope para o MLG com função de ligação probito
+fit.model <- fit.mod2
+source("http://www.ime.usp.br/~giapaula/envelr_bino")
+``` 
+
+\mar Assim como na Figura \ref{fig:fig3}, a Figura \ref{fig:fig4} mostra uma observação fora do envelope, é um indicativo de que o modelo não foi ajustado de forma correta.
+
+```{r, fig5, fig.align = "center", fig.cap = "Gráfico de envelope para o modelo com função de ligação cloglog", fig.height = 4, fig.width = 5, fig.pos = 'H'}
+# Envelope para o MLG com função de ligação cloglog
+fit.model <- fit.mod3
+source("http://www.ime.usp.br/~giapaula/envelr_bino")
+``` 
+
+\mar Da mesma forma, na Figura \ref{fig:fig5}, uma observação está fora do envelope, pode ser que o modelo não está ajustado corretamente.
+
+```{r, fig6, fig.align = "center", fig.cap = "Gráfico de envelope para o modelo com função de ligação loglog", fig.height = 4, fig.width = 5, fig.pos = 'H'}
+# Envelope para o MLG com função de ligação loglog
+fit.model <- fit.mod4
+source("http://www.ime.usp.br/~giapaula/envelr_bino")
+``` 
+
+\mar Na Figura \ref{fig:fig6}, é possível constatar que seis observações estão fora do envelope, significa que este modelo não fez um bom ajuste, pode ser que alguma das suposições feitas a cerca do modelo foi violada, por exemplo, a suposição de que a variável resposta $\mathtt{y}$ tem distribuição Binomial.
+
+```{r, fig7, fig.align = "center", fig.cap = "Gráfico de envelope para o modelo com função de ligação cauchito", fig.height = 4, fig.width = 5, fig.pos = 'H'}
+# Envelope para o MLG com função de ligação cauchito
+fit.model <- fit.mod5
+source("http://www.ime.usp.br/~giapaula/envelr_bino")
+```
+
+\mar Todas as observações encontram-se dentro do envelope, conforme consta na Figura \ref{fig:fig7}, isto significa que o modelo foi ajustado de forma adequada.
+
+ - Gráficos de diagnóstico 
+ 
+\mar Nas figuras a seguir são apresentados os gráficos de diagnóstico. O gráfico da Medida h \textit{versus} Valor ajustado permite identificar os pontos de alavanca. Com o  gráfico da Distância de Cook \textit{versus} Índice é possível identificar os pontos influentes. Já o gráfico do Resíduo Componente do Desvio \textit{versus} Índice, identifica os chamados pontos aberrantes ou \textit{outliers}. E, por fim, o gráfico do Resíduo Componente  do Desvio \textit{versus} Valor ajustado avalia a função de ligação escolhida.
+
+```{r, fig8, fig.align = "center", fig.cap = "Gráfico de diagnóstico para o modelo com função de ligação logito", fig.height = 4.8, fig.width = 6.8, fig.pos = 'H'}
+# Diagnóstico para o MLG com função de ligação logito
+attach(dados)
+
+fit.model <- fit.mod1
+source("http://www.ime.usp.br/~giapaula/diag_bino")
+``` 
+
+\mar Na Figura \ref{fig:fig8}, as observações de números 1 e 2 requerem maior atenção, uma vez que pelos gráficos de diagnósticos, tais observações podem ser consideradas como pontos de alavanca, pontos influentes e também pontos aberrantes.
+
+```{r, fig9, fig.align = "center", fig.cap = "Gráfico de diagnóstico para o modelo com função de ligação probito", fig.height = 4.8, fig.width = 6.8, fig.pos = 'H'}
+# Diagnóstico para o MLG com função de ligação probito
+fit.model <- fit.mod2
+source("http://www.ime.usp.br/~giapaula/diag_bino")
+``` 
+
+\mar Os gráficos de diagnósticos da Figura \ref{fig:fig9} apontam que a observação de número 1 pode ser considerada como um ponto influente e aberrante. Já a observação de número 2, como sendo ponto de alavanca e aberrante.
+
+```{r, fig10, fig.align = "center", fig.cap = "Gráfico de diagnóstico para o modelo com função de ligação cloglog", fig.height = 4.8, fig.width = 6.8, fig.pos = 'H'}
+# Diagnóstico para o MLG com função de ligação clolog
+fit.model <- fit.mod3
+source("http://www.ime.usp.br/~giapaula/diag_bino")
+``` 
+
+\mar Na Figura \ref{fig:fig10}, a observação de número 7 pode ser considerada um ponto de alavanca e a observação 2 como sendo um ponto influente e aberrante.
+
+```{r, fig11, fig.align = "center", fig.cap = "Gráfico de diagnóstico para o modelo com função de ligação loglog", fig.height = 4.8, fig.width = 6.8, fig.pos = 'H'}
+# Diagnóstico para o MLG com função de ligação loglog
+fit.model <- fit.mod4
+source("http://www.ime.usp.br/~giapaula/diag_bino")
+``` 
+
+\mar De acordo com os gráficos de diagnósticos da Figura \ref{fig:fig11}, a observação de número 1 pode ser considerada como pontos de alavanca, influente e também aberrante, além disso as observações de números 2, 3 e 7 como sendo pontos aberrantes.
+
+```{r, fig12, fig.align = "center", fig.cap = "Gráfico de diagnóstico para o modelo com função de ligação cauchito", fig.height = 4.8, fig.width = 6.8, fig.pos = 'H'}
+# Diagnóstico para o MLG com função de ligação cauchito
+fit.model <- fit.mod5
+source("http://www.ime.usp.br/~giapaula/diag_bino")
+``` 
+
+\mar A Figura \ref{fig:fig12} apresenta os gráficos de diagnósticos em que é possível notar que a observação de número 4 pode ser apontada como pontos de alavanca e influente. 
+
+### Conclusão
+
+\mar Após realizar as análises, o melhor modelo, de acordo com as medidas AIC, Desvio residual, análise de envelope e de diagnóstico, é o modelo MLG em que se utilizou como função de ligação a $\texttt{cauchito}$.
+
+
+\mar O modelo estimado para predizer a proporção de mosquitos mortos é dado por:
+
+\mar \mar $\hat{p_{i}} = \dfrac{1}{2} + \dfrac{\arctan(-5,074 + 0,209*dose_{i})}{\pi}$.
+
+Modelo final escolhido:
+\begin{itemize}
+\item Componente aleatório: $y_{1}, \dots, y_{7}$ a.a. de $Y_{i} \sim Binomial(n, p_{i})$, $i = 1, \dots, 7$. 
+\item Componente sistemático: $\eta_{i} = -5,074 + 0,209*dose_{i}$, $i = 1, \dots, 7$.
+\item Função de ligação: $g(\mu_{i}) = \eta_{i} = \tan \Bigl( \pi\Bigl(p_{i} - \dfrac{1}{2} \Bigr) \Bigr)$.
+\end{itemize}
+
+## Exercício 2
+
+\mar Os dados deste exercício são dados na forma binária correspondentes a um estudo sobre doença coronária segundo diferentes variáveis. Foram avaliados 78 pacientes, identificou-se as seguintes variáveis: $\mathtt{dc}$: doença coronária 1: possui, 0: não possui; $\mathtt{sexo}$: 1: masculino e 0: feminino; $\mathtt{ecg}$: nível de gravidade no exame do eletrocardiograma 0: nível baixo, 1: nível médio, 2: nível alto e, por fim, $\mathtt{idade}$: idades entre 28 e 63 anos.
+
+### Análise da dados preliminar
+
+```{r, results = 'hide'}
+# Código para fazer a leitura dos dados
+dados2 <- read.table('http://www.uel.br/pessoal/silvano/Dados/chd4a.txt', header = T)
+dados2 <- data.frame(dados2)
+```
+
+\begin{table}[H]
+\centering
+\setlength{\tabcolsep}{6pt}
+\caption{Medidas resumo da variável idade}
+\begin{tabular}{cccccccc}
+\hline
+Variável & Min. & Med. & Máx. & Média & DP & Var. \\ \hline
+idade & 28 & 46,5 & 63 & 46,9 & 8,55 & 73,13 \\ \hline
+\end{tabular}
+\label{tab:residade}
+\end{table}
+
+\mar De acordo com a Tabela \ref{tab:residade}, é possível observar que a idade média dos pacientes é de aproximadamente 47 anos, e também que a idade mínima e máxima são de 28 e 63 anos, respectivamente.
+
+```{r, fig13, echo = FALSE, results = 'hide', fig.align = "center", fig.cap = "Gráfico de pontos da doença coronária pela idade", fig.height = 3, fig.width = 5, fig.pos = 'H'}
+# Gráfico da Doença coronária x Idade 
+g3 <- ggplot(dados2, aes(x = dados2$idade, y = dados2$dc)) + xlab("Idade (anos)") + ylab("Doença coronária") + 
+  ggtitle("") + geom_point() + theme_minimal() + theme(legend.position = "none",
+                                                       plot.title = element_text(hjust = 0.45)) 
+g3
+```
+
+\mar Com o intuito de ilustrar e comprovar que os dados deste exercício estão na forma binária, foi feita a Figura \ref{fig:fig13}. 
+
+### Ajustes dos modelos lineares generalizados
+
+```{r, results = 'hide'}
+# Ajuste do modelo MLG com função de ligação logito
+mod1 <- glm(dc ~ sexo + ecg + idade, data = dados2, family = binomial(link = "logit"))
+
+# Ajuste do modelo MLG com função de ligação probito
+mod2 <- glm(dc ~ sexo + ecg + idade, data = dados2, family = binomial(link = "probit"))
+
+# Ajuste do modelo MLG com função de ligação cauchito
+mod3 <- glm(dc ~ sexo + ecg + idade, data = dados2, family = binomial(link = "cauchit"))
+
+# Ajuste do modelo MLG com função de ligação cloglog
+mod4 <- glm(dc ~ sexo + ecg + idade, data = dados2, family = binomial(link = "cloglog"))
+
+# Ajuste do modelo MLG com função de ligação loglog
+loglog <- function()  structure(list(
+    linkfun = function(mu) -log(-log(mu)),
+    linkinv = function(eta)
+      pmax(pmin(exp(-exp(-eta)), 1 - .Machine$double.eps), .Machine$double.eps),
+    mu.eta = function(eta) {
+      eta <- pmin(eta, 700)
+      pmax(exp(-eta - exp(-eta)), .Machine$double.eps)
+    },
+    dmu.deta = function(eta)
+      pmax(exp(-exp(-eta) - eta) * expm1(-eta), .Machine$double.eps),
+    valideta = function(eta) TRUE,
+    name = "loglog"
+), class = "link-glm")
+
+mod5 <- glm(dc ~ sexo + ecg + idade, data = dados2, family = binomial(link = loglog()))
+
+# Resumo das medidas dos modelos MLG ajustados
+summary(mod1)
+summary(mod2)
+summary(mod3)
+summary(mod4)
+summary(mod5)
+```
+
+ - Estatística de Hosmer-Lemeshow
+ 
+\mar A estatística de Hosmer-Lemeshow é utilizada com a finalidade de testar a bondade do ajuste, ou seja, comprova se o modelo proposto pode explicar de maneira correta o que se observa.
+
+```{r, results = 'hide'}
+# Estatística Hosmer-Lemeshow
+source("http://www.poleto.com/funcoes/gof.bino.txt")
+attach(dados2)
+
+ajuste <- mod1
+hlmod1 <- gof.bino(ajuste, grupos = 10)$pvalue
+
+ajuste <- mod2
+gof.bino(ajuste, grupos = 10)
+hlmod2 <- gof.bino(ajuste, grupos = 10)$pvalue
+
+ajuste <- mod3
+gof.bino(ajuste, grupos = 10)
+hlmod3 <- gof.bino(ajuste, grupos = 10)$pvalue
+
+ajuste <- mod4
+gof.bino(ajuste, grupos = 10)
+hlmod4 <- gof.bino(ajuste, grupos = 10)$pvalue
+
+ajuste <- mod5
+gof.bino(ajuste, grupos = 10)
+hlmod5 <- gof.bino(ajuste, grupos = 10)$pvalue
+```
+
+ - Curva ROC
+ 
+```{r, results = 'hide'}
+# Curva ROC
+r.bp <- Roc(list(mod1, mod2, mod3, mod4, mod5), data = dados2)
+
+print(r.bp)
+
+AUC1 <- unlist(unclass(r.bp$Auc[[1]]))
+AUC2 <- unlist(unclass(r.bp$Auc[[2]]))
+AUC3 <- unlist(unclass(r.bp$Auc[[3]]))
+AUC4 <- unlist(unclass(r.bp$Auc[[4]]))
+AUC5 <- unlist(unclass(r.bp$Auc[[5]]))
+```
+
+```{r, fig14, fig.align = "center", fig.cap = "Curva ROC para os modelos MLG ajustados", fig.height = 4, fig.width = 5, fig.pos = 'H'}
+# Curva ROC para os modelos MLG ajustados
+plot(r.bp, auc = TRUE, text.col = c(1, 2, 3, 4, 5), ylab = "Sensitividade",
+     xlab = "1 - Especificidade")
+``` 
+
+\begin{table}[H]
+\centering
+\setlength{\tabcolsep}{6pt}
+\caption{Critério AIC, desvio residual, estatística de Hosmer-Lemeshow e área abaixo da curva ROC dos modelos MLG ajustados}
+\begin{tabular}{ccccc}
+\hline
+Função de ligação & AIC & Desvio residual & Hosmer-Lemeshow & AUC \\ \hline
+Logito & 94,81 & 86,81 & 0,67 & 0,78 \\
+Probito & 94,79 & 86,79 & 0,65 & 0,78 \\ 
+Cauchito & 94,99 & 86,99 & 0,75 & 0,78 \\ 
+Cloglog & 94,00 & 86,00 & 0,62 & 0,79 \\
+Loglog & 96,16 & 88,16 & 0,34 & 0,78 \\ \hline
+\end{tabular}
+\label{tab:AIC2}
+\end{table}
+
+\mar Conforme é possível observar na Tabela \ref{tab:AIC2}, o modelo que melhor se ajustou aos dados foi o que utilizou como função de ligação a $\texttt{cloglog}$. Este modelo possui o menor AIC, menor Desvio residual, estatística de Hosmer-Lemeshow de 0,62 e AUC de maior valor igual a 0,79. 
+
+```{r, fig15, fig.align = "center", fig.cap = "Gráfico de envelope para o modelo com função de ligação cloglog", fig.height = 4, fig.width = 5, fig.pos = 'H'}
+# Envelope para o MLG com função de ligação cloglog
+fit.model <- mod4
+source("http://www.ime.usp.br/~giapaula/envel_bino")
+``` 
+
+\mar O gráfico de envelope apresentado na Figura \ref{fig:fig15} mostra que todas as observações encontram-se entre as faixas de confiança do envelope simulado, isso significa que o modelo foi ajustado de forma correta. 
+
+```{r, fig16, fig.align = "center", fig.cap = "Gráfico de diagnóstico para o modelo com função de ligação cloglog", fig.height = 4.8, fig.width = 6.8, fig.pos = 'H'}
+# Diagnóstico para o MLG com função de ligação clolog
+fit.model <- mod4
+source("https://www.ime.usp.br/~giapaula/diag_bino")
+``` 
+
+\mar De acordo com os gráficos de diagnóstico da Figura \ref{fig:fig16}, temos uma observação classificada como ponto de alavanca, outra como ponto influente e uma última classificada como ponto aberrante.
+
+### Conclusão
+
+\mar Após realizar as análises, o melhor modelo, de acordo com as medidas AIC, estatística de Hosmer-Lemeshow, curva ROC, análise de envelope e de diagnóstico, é o modelo MLG em que se utilizou como função de ligação a $\texttt{cloglog}$.
+
+\mar O modelo estimado para predizer se uma pessoa possa ter doença cardíaca em função da idade média é dado por:
+
+\mar \mar $\hat{p_{i}} = 1 - \exp\{-\exp\{-4,481 + 0,92*sexo_{i} + 0,561*ecg_{i} + 0,07*idade_{i} \} \}$.
+
+Modelo final escolhido:
+\begin{itemize}
+\item Componente aleatório: $y_{1}, \dots, y_{78}$ a.a. de $Y_{i} \sim Bernoulli(p_{i})$, $i = 1, \dots, 78$. 
+\item Componente sistemático: $\eta_{i} = -4,481 + 0,92*sexo_{i} + 0,561*ecg_{i} + 0,07*idade_{i}$, $i = 1, \dots, 78$.
+\item Função de ligação: $g(\mu_{i}) = \eta_{i} = \log(-\log(1 - p_{i}))$, $i = 1, \dots, 78$.
+\end{itemize}
