@@ -1,0 +1,525 @@
+---
+title: "SME0823 - Modelos Lineares Generalizados - Lista 2"
+author: 
+- "Danilo Augusto Ganancin Faria -- Nº USP: 9609172" 
+- "Guilherme Milan Santos -- Nº USP: 9012966"
+- "Teh Led Red -- Nº USP: 10368927"
+- "Vinicius Henrique Valentim -- Nº USP: 10349432"
+date: "`r format(Sys.time(), '%d de %B de %Y')`"
+header-includes:
+   - \usepackage{float}
+   - \usepackage{here}
+   - \usepackage[brazil]{babel}
+   - \usepackage{caption}
+   - \usepackage{mathtools}
+   - \usepackage{setspace}\onehalfspacing
+output:
+  pdf_document: default
+  fig_caption: yes
+  urlcolor: blue
+  linkcolor: blue
+  fontsize: 12pt
+  geometry: margin=0.75in
+fig_width: 10
+fig_height: 6
+---
+\newcommand{\mar}{\hspace{.3cm}}
+\newcommand{\ld}{\vspace{.15cm}}
+
+```{r setup, include=FALSE}
+# knitr::opts_chunk$set(cache = TRUE, message = FALSE, warning = FALSE, error = FALSE)
+knitr::opts_chunk$set(message = FALSE, warning = FALSE, error = FALSE, tidy = TRUE)
+```
+
+## Exercício 10
+
+\mar Os dados considerados neste exercício correspondem a uma amostra aleatória do salário anual (entre 110 e 172 mil USD) de 220 executivos (145 homens e 75 mulheres). Identificou-se ainda as seguintes variáves explicativas: sexo (1: masculino; 0: feminino), posição na empresa (varia de 1 a 9), quanto maior o valor mais alta a posição e anos de experiência no cargo ou tempo no cargo (varia de 1,7 a 26,1 anos).
+
+
+```{r, include = FALSE}
+# Pacotes utilizados no decorres da análise
+library(GGally)
+library(lattice)
+library(ggplot2)
+library(gridExtra)
+library(ggpubr)
+library(qqplotr)
+library(MASS)
+library(olsrr)
+library(base)
+library(xtable)
+source('C:\\Users\\DaNiLo\\Dropbox\\ESTATÍSTICA\\Disciplinas\\6º Período\\Modelos Lineares Generalizados\\Jorge Bazan\\2019\\Listas\\Exercício 10 L2\\diagnostico.R')
+```
+
+\mar Para iniciar o tratamento dos dados utilizou-se o código abaixo.
+
+```{r, results = 'hide'}
+# Código para ler os dados e renomear as colunas
+salary <- read.table('C:\\Users\\DaNiLo\\Documents\\Git\\mlg\\Exercício 10 L2\\salary.dat')
+class(salary)
+colnames(salary)
+names(salary)[names(salary) == "V1"] <- "salario"
+names(salary)[names(salary) == "V2"] <- "genero"
+names(salary)[names(salary) == "V3"] <- "posicao"
+names(salary)[names(salary) == "V4"] <- "experiencia"
+
+# Separando dados por sexo
+salary_masc <- salary[salary$genero == 'Masculino',]
+salary_fem <- salary[salary$genero == 'Feminino',]
+```
+
+### Análise de dados preliminar
+```{r, results = 'hide'}
+summary(salary)
+# Análise descritiva separada por sexo
+# Masculino
+summary(salary_masc)
+head(salary_masc)
+sd(salary_masc$salario)
+var(salary_masc$salario)
+sd(salary_masc$posicao)
+var(salary_masc$posicao)
+sd(salary_masc$experiencia)
+var(salary_masc$experiencia)
+
+# Feminino
+summary(salary_fem)
+head(salary_fem)
+sd(salary_fem$salario)
+var(salary_fem$salario)
+sd(salary_fem$posicao)
+var(salary_fem$posicao)
+sd(salary_fem$experiencia)
+var(salary_fem$experiencia)
+```
+
+\mar Com o intuito de exemplificar a estrutura dos dados, utilizou-se os comandos como segue.
+
+```{r,}
+head(salary)
+tail(salary)
+```
+
+
+```{r, echo = FALSE, fig.align = "center", fig.cap = "Gráficos de caixa do salário médio dos executivos de ambos os sexos.", fig.height = 3, fig.pos = 'H', fig.width = 5}
+ggplot(salary, aes(y = salario, x = genero, color = genero), main = 'bla') +
+  xlab("Gênero") + ylab("Salário") + ggtitle("") + geom_boxplot() + 
+  theme_minimal() + theme(legend.position = "none",
+                          plot.title = element_text(hjust = 0.45))
+```
+\mar De acordo com a Figura 1, há indícios de que os homens recebam maiores salários em comparação com as mulheres. Nota-se também a presença de um \textit{outlier} em relação ao sexo feminino.
+
+\begin{table}[H]
+\centering
+\setlength{\tabcolsep}{6pt}
+\caption{Medidas resumo da variável Gênero}
+\begin{tabular}{cccccccc}
+\hline
+Gênero & Amostra & Min. & Med. & Máx. & Média & DP & Var. \\ \hline
+Feminino & 75 & 118 & 139 & 172 & 140,5 & 12,5 & 156,14 \\
+Masculino &  145 & 110 & 145 & 171 & 144,1 & 12,39 & 153,61 \\ \hline
+\end{tabular}
+\label{tab:res_gen}
+\end{table}
+
+\mar Na Tabela \ref{tab:res_gen} é possível verificar que a média salarial para executivos do sexo masculino é maior em comparação ao sexo feminino, apesar deste fato, o maior salário corresponde à uma executiva do sexo feminino, nota-se também que em ambos os casos temos uma variância salarial consideravelmente alta. 
+
+```{r, results = 'hide'}
+# Teste-t para comparação das médias
+t.test(salary_masc$salario, salary_fem$salario, alternative = "two.sided",
+       var.equal = FALSE)
+```
+\mar Com a finalidade de comprovar que as médias salariais entre os sexos são estatisticamente diferentes, foi realizado o Teste-t.
+
+\begin{table}[H]
+\centering
+\setlength{\tabcolsep}{6pt}
+\caption{Teste-t para comparação das médias.}
+\begin{tabular}{ccc}
+\hline
+Teste & Estatística & valor-p \\ \hline
+t & 2,06 & 0,04 \\ \hline
+\end{tabular}
+\label{tab:ttest}
+\end{table}
+
+De acordo com a Tabela \ref{tab:ttest}, o valor-p indica que há diferença entre as médias ao nível de $5\%$ de significância. Dessa forma, podemos afirmar que os executivos ganham em média mais do que as executivas.
+
+\begin{table}[H]
+\centering
+\setlength{\tabcolsep}{6pt}
+\caption{Estatísticas descritiva das variáveis Salário, Posição e Experiência}
+\begin{tabular}{ccccccc}
+\hline
+Variável & Min. & Med. & Máx. & Média & DP & Var. \\ \hline
+Salário & 110 & 143,5 & 172 & 142,9 & 12,52 & 156,76 \\
+Posição & 1 & 5 & 9 & 5,068 & 1,78 & 3,19 \\ 
+Experiência & 1,7 & 9,5 & 26,1 & 10,48 & 5,21 & 27,19 \\ \hline
+\end{tabular}
+\label{tab:res_dados}
+\end{table}
+
+\mar Como pode-se observar na Tabela \ref{tab:res_dados}, a variável Salário possui valores entre 110 e 172, com média de 142,9 bem próxima de sua mediana 143,5 e ainda com uma variância razoavelmente grande de 156,76. 
+
+Da mesma forma, a variável Experiência está entre 1,7 e 26,1 possui média de 10,48 e mediana de 9,5 sugerindo assim como a variável Salário uma certa simetria pelo fato da média estar razoavelmente próxima da mediana.
+
+Já na Figura 2, os gráficos de caixa nos mostram que em média os homens ocupam cargos mais altos nas empresas e também que eles passam mais tempo ocupando esses cargos quando comparados às mulheres.
+
+```{r, echo = FALSE, fig.height = 3, fig.width = 7, fig.align = "center", fig.cap = "Gráficos de caixa das variáveis Posição e Experiência de ambos os sexos", fig.pos = "H"}
+
+g1 <- ggplot(salary, aes(y = posicao, x = genero, color = genero), main = 'bla') +
+  xlab("Gênero") + ylab("Posição") + ggtitle("") + geom_boxplot() + 
+  theme_minimal() + theme(legend.position = "none", 
+                          plot.title = element_text(hjust = 0.45))
+
+g2 <- ggplot(salary, aes(y = experiencia, x = genero, color = genero), main = 'bla') +
+  xlab("Gênero") + ylab("Experiência") + ggtitle("") + geom_boxplot() + 
+  theme_minimal() + theme(legend.position = "none", 
+                          plot.title = element_text(hjust = 0.45))
+
+grid.arrange(g1, g2, ncol = 2)
+```
+
+```{r, echo = FALSE, fig.height = 5, fig.width = 9, fig.align = "center", fig.cap = "Gráfico de dispersão múltipla das variáveis.", fig.pos = "H"}
+ggpairs(salary, aes(colour = genero, alpha = 0.4)) 
+```
+
+\mar No gráfico de dispersão múltipla da Figura 3, as variáveis Salário e Posição estão fortemente correlacionadas de maneira positiva $(\rho = 0,819)$ e as variáveis Posição e Experiência estão moderadamente correlacionadas $(\rho = 0,57)$ ou seja, há indícios de que grandes posições e experiência remetem em grandes salários para ambos os sexos, sugerindo inicialmente um modelo linear.
+
+### Ajuste do modelo linear
+
+O modelo inicialmente proposto é: 
+\begin{equation}\label{eqn:eq1}
+y_{i} = \beta_{0} + \beta_{1}genero_{i} + \beta_{2}posicao_{i} + \beta_{3}experiencia_{i} + \varepsilon_{i },
+\end{equation}
+para $i = 1, \dots, 220$, em que $y_i$ corresponde ao salário do $i$-ésimo executivo da amostra e $\varepsilon_{i} \stackrel{i.i.d.}{\sim} N(0, \sigma^2)$.
+
+
+```{r, results = 'hide'}
+# Ajuste do modelo linear
+# Modelo linear completo
+modelo <- lm(salario ~., data = salary)
+summary(modelo)
+xtable(stepAIC(modelo))
+```
+
+\begin{table}[H]
+\centering
+\setlength{\tabcolsep}{6pt}
+\caption{Estimativas dos parâmetros para o modelo proposto.}
+\begin{tabular}{cccc}
+  \hline
+Efeito & Estimativa & valor-t & valor-p \\ \hline
+Intercepto & 115,26 & 82,25 & 0,00 \\ 
+GêneroMasculino & -2,20 & -2,04 & 0,04 \\ 
+Posição & 6,71 & 21,46 & 0,00 \\ 
+Experiência & -0,47 & -4,17 & 0,00 \\
+$R^{2}$ & 0,71 \\ 
+Erro padrão & 6,77 \\
+AIC & 845,31 \\ \hline
+\end{tabular}
+\label{tab:est_modcom}
+\end{table}
+
+\mar De acordo com as estimativas da Tabela \ref{tab:est_modcom}, todas as variáveis são significativas ao nível de significância de $5\%$.
+
+```{r, echo = FALSE, fig.height = 3, fig.width = 5, fig.align = "center", fig.cap = "Q-Q plot dos resíduos do modelo ajustado.", fig.pos = "H"}
+# QQPlot dos resíduos
+modelo_res <- data.frame(modelo$residuals)
+gg <- ggplot(data = modelo_res, mapping = aes(sample = modelo.residuals)) +
+  stat_qq_band(bandType = "pointwise", fill = "#89B2E8", alpha = 0.4) +
+  stat_qq_line(linetype = 2) + stat_qq_point() +
+  labs(x = "Quantis teóricos N(0,1)", y = "Quantis amostrais") + theme_minimal() 
+gg
+```
+
+```{r, results = 'hide'}
+# Teste de normalidade de Shapiro-Wilk
+shapiro.test(modelo$residuals)
+```
+
+\begin{table}[H]
+\centering
+\setlength{\tabcolsep}{6pt}
+\caption{Teste de normalidade de Shapiro-Wilk para os resíduos do modelo ajustado.}
+\begin{tabular}{ccc}
+\hline
+Teste & Estatística & valor-p \\ \hline
+Shapiro-Wilk & 0,994 & 0,503 \\ \hline
+\end{tabular}
+\label{tab:swtest}
+\end{table}
+
+\mar O \textit{Q-Q} plot da Figura 4 mostra que grande maioria dos pontos estão próximos à reta apesar de algumas observações nas caudas estarem afastadas.
+O resultado obtido pelo teste de \textit{Shapiro-Wilk} como mostrado na Tabela \ref{tab:swtest} afirmou que os resíduos seguem uma distribuição Normal ao nível de significância de $5\%$.
+
+```{r, results = 'hide'}
+# Teste de independência de Durbin-Watson
+lmtest::dwtest(modelo)
+```
+
+\begin{table}[H]
+\centering
+\setlength{\tabcolsep}{6pt}
+\caption{Teste de independência de Durbin-Watson para os resíduos do modelo ajustado.}
+\begin{tabular}{ccc}
+\hline
+Teste & Estatística & valor-p \\ \hline
+Durbin-Watson & 1,879 & 0,187 \\ \hline
+\end{tabular}
+\label{tab:dwtest}
+\end{table}
+
+\mar Como mostrado na Tabela \ref{tab:dwtest}, o teste de \textit{Durbin-Watson} ao nível de $5\%$ de significância atesta que os resíduos são independentes.
+
+```{r, results = 'hide'}
+# Teste de homocedasticidade de Breusch-Pagan
+lmtest::bptest(modelo)
+```
+
+```{r, echo = FALSE, fig.align = "center", fig.cap = "Gráfico dos Resíduos versus Valores ajustados.", fig.height = 3, fig.pos = 'H', fig.width = 5}
+# Valores ajustados versus Resíduos
+p1 <- ggplot(modelo, aes(.fitted, .resid)) + geom_point()
+p1 <- p1 + stat_smooth(method = "lm", fill = "#89B2E8") + 
+  geom_hline(yintercept = 0, col = "red", linetype = "dashed")
+p1 <- p1 + xlab("Valores ajustado") + ylab("Resíduo")
+p1 <- p1 + ggtitle("") + theme_minimal() 
+p1
+```
+
+\begin{table}[H]
+\centering
+\setlength{\tabcolsep}{6pt}
+\caption{Teste de homocedasticidade de Breush-Pagan para a variância dos resíduos do modelo ajustado.}
+\begin{tabular}{ccc}
+\hline
+Teste & Estatística & valor-p \\ \hline
+Breusch-Pagan & 0,106 & 0,991 \\ \hline
+\end{tabular}
+\label{tab:bptest}
+\end{table}
+
+\mar A Figura 5 não apresenta nenhuma tendência e está bem espalhada, temos indícios de independência e de que as variâncias podem ser constantes. O que é comprovado com o teste de \textit{Breusch-Pagan} conforme resultado pode ser conferido na Tabela \ref{tab:bptest}, ao nível de $5\%$ de significância.
+
+\mar Após ter feito a comprovação de todas as suposições acerca do modelo de regressão linear múltipla pode-se então prosseguir para a seleção de modelos.
+
+
+### Seleção do modelo
+
+\mar A variável Gênero possui dois níveis (masculino e feminino). Pelo fato desses dois níveis não possuir a mesma variação em relação às outras variáveis, utiliza-se a interação entre os fatores para avaliar tal situação.
+
+\mar Por exemplo, a presença de interação entre os fatores Gênero e Experiência significa que a diferença entre os salários médios de executivos e executivas não é a mesma à medida que varia o tempo de experiência.
+
+```{r, results = 'hide'}
+# Interação entre os fatores
+# Mondelo completo + genero*experiencia
+modelo1 <- lm(salario ~. + genero*experiencia, data = salary)
+summary(aov(modelo1))
+stepAIC(modelo1)
+
+# Modelo completo + genero*posicao
+modelo2 <- lm(salario ~. + genero*posicao, data = salary)
+summary(aov(modelo2))
+stepAIC(modelo2)
+
+# Modelo completo + experiencia*posicao
+modelo3 <- lm(salario ~. + experiencia*posicao, data = salary)
+summary(aov(modelo3))
+stepAIC(modelo3)
+summary(modelo3)
+```
+
+\begin{table}[H]
+\centering
+\setlength{\tabcolsep}{6pt}
+\caption{Estimativas das interações entre os fatores.}
+\begin{tabular}{ccccc} \hline
+Interação & $R^2$ & AIC & valor-F & valor-p \\ \hline
+Gênero*Experiência & 0,714 & 845,66 & 1,615 & 0,205 \\ 
+Gênero*Posição & 0,712  & 847,31 & 0,001 & 0,974 \\ 
+Experiência*Posição & 0,722 & 839,67 & 7,594 & 0,006 \\ \hline 
+\end{tabular}
+\label{tab:int_mod}
+\end{table}
+
+\mar De acordo com a Tabela \ref{tab:int_mod}, será incluída no modelo somente a interação \emph{experiencia*posicao}.
+
+\mar Dessa forma, o modelo final selecionado é dado por: 
+\begin{equation}\label{eqn:eq2}
+y_{i} = \beta_{0} + \beta_{1}genero_{i} + \beta_{2}posicao_{i} + \beta_{3}experiencia_{i} + \beta_{4} experiencia*posicao + \varepsilon_{i},
+\end{equation}
+para $i = 1, \dots, 220$, em que $y_i$ corresponde ao salário do $i$-ésimo executivo da amostra e $\varepsilon_{i} \stackrel{i.i.d.}{\sim} N(0, \sigma^2)$.
+
+\begin{table}[ht]
+\centering
+\setlength{\tabcolsep}{6pt}
+\caption{Estimativas dos parâmetros para o modelo final.}
+\begin{tabular}{cccc}
+  \hline
+  Efeito & Estimativa & valor-t & valor-p \\ 
+  \hline
+  Intercepto & 108,042 & 36,48 & 0,000 \\ 
+  GêneroMasculino & -2,811 & -2,59 & 0,010 \\ 
+  Posição & 8,096 & 13,73 & 0,000 \\ 
+  Experiência & 0,336 & 1,07 & 0,285 \\ 
+  Posicao*Experiência & -0,135 & -2,76 & 0,006 \\ 
+  $R^{2}$ & 0,722 \\ 
+  Erro padrão & 6,667  \\ \hline
+\end{tabular}
+\label{tab:est_modsel}
+\end{table}
+
+\mar Na Tabela \ref{tab:est_modsel} encontram-se as estimativas dos parâmetros para o modelo selecionado. Note que, o modelo final apresenta melhor coeficiente de determinação pois consegue explicar mais do que $72\%$ dos valores observados em relação à variável resposta.
+
+\mar Portanto, o modelo ajustado é dado por: 
+\begin{equation}\label{eqn:ajus}
+\hat{y}(\textbf{x}) = 108,042 - 2,811genero + 8,096posicao + 0,336experiencia - 0,135experiencia*posicao,
+\end{equation}
+em que $\textbf{x} = (genero, posicao, experiencia)^{T}.$
+
+Interpretação do modelo ajustado:
+\begin{itemize}
+\item Para cada aumento de uma unidade da variável Gênero, o salário médio dos executivos diminui em 2,811 unidades;
+\item Para cada aumento de uma unidade da variável Posição, o salário médio dos executivos aumenta em 8,096 unidades;
+\item Para cada aumento de uma unidade da variável Experiência, o salário médio dos executivos aumenta em 0,336 unidades;
+\item Para cada aumento de uma unidade da variável combinada Experiência*Posição, o salário médio dos executivos diminui em 0,135 unidades.
+\end{itemize}
+
+
+### Diagnóstico do modelo ajustado
+
+
+```{r, echo = FALSE, fig.height = 3, fig.width = 7, fig.align = "center", fig.cap = "Histograma e Q-Q plot dos resíduos do modelo final ajustado", fig.pos = "H"}
+# Histograma dos resíduos do modelo ajustado
+n <- length(modelo3$residuals)
+mean <- mean(modelo3$residuals)
+sd <- sd(modelo3$residuals)
+binwidth <- 1 
+x <- rnorm(n, mean, sd)
+df <- data.frame(x)
+
+hist <- ggplot(df, aes(x = x, mean = mean, sd = sd, binwidth = binwidth, n = n)) +
+  theme_minimal() +
+  geom_histogram(binwidth = binwidth, 
+                 color = "#00AFBB", fill = "#00AFBB", alpha = 0.4, position = "identity", size = 1) + 
+  stat_function(fun = function(x) dnorm(x, mean = mean, sd = sd) * n * binwidth,
+                color = "#00AFBB", size = 1) + xlab("Resíduos") + 
+  ylab("Frequência") + ggtitle("") + theme(legend.position = "none")
+
+# QQPlot dos resíduos
+modelo3_res <- data.frame(modelo3$residuals)
+qq <- ggplot(data = modelo3_res, mapping = aes(sample = modelo3.residuals)) +
+  stat_qq_band(bandType = "pointwise", fill = "#89B2E8", alpha = 0.4) +
+  stat_qq_line(linetype = 2) + stat_qq_point() +
+  labs(x = "Quantis teóricos N(0,1)", y = "Quantis amostrais") + theme_minimal() 
+
+grid.arrange(hist, qq, ncol = 2)
+```
+
+```{r, results = 'hide'}
+# Teste de normalidade de Shapiro-Wilk
+shapiro.test(modelo3$residuals)
+
+# Teste de independência de Durbin-Watson
+lmtest::dwtest(modelo3)
+
+# Teste de homocedasticidade de Breusch-Pagan
+lmtest::bptest(modelo3)
+```
+
+\begin{table}[H]
+\centering
+\setlength{\tabcolsep}{6pt}
+\caption{Testes de normalidade, independência e de homocedasticidade para os resíduos do modelo ajustado.}
+\begin{tabular}{ccc}
+\hline
+Teste & Estatística & valor-p \\ \hline
+Shapiro-Wilk & 0,994 & 0,482 \\ 
+Durbin-Watson & 1,825 & 0,099  \\
+Breusch-Pagan & 0,806 & 0,938 \\ \hline
+\end{tabular}
+\label{tab:ajusttest}
+\end{table}
+
+De acordo com a Figura 6 e o gráfico do resíduo \textit{versus} valor ajustado da Figura 7, e ainda com as informações da Tabela \ref{tab:ajusttest}, ao nível de $5\%$ de significância, o modelo na fórmula \eqref{eqn:eq2} atende à todas as suposições (normalidade, indepêndencia e variância constante) de um modelo de regressão linear múltipla com erros normais.
+
+```{r, echo = FALSE, fig.height = 5, fig.width = 8, fig.align = "center", fig.cap = "Diagnóstico do modelo ajustado.", fig.pos = "H"}
+source("diagnostico.r")
+
+# Residuals vs Fitted Plot
+xlab_resfit <- "Valor ajustado"
+ylab_resfit <- "Resíduo"
+title_resfit <- ""
+
+# Cook's distance Plot
+xlab_cook <- "Observação"
+ylab_cook <- "Medida h"
+title_cook <- ""
+
+# Residuals vs Leverage Plot
+xlab_reslev <- "Alavancagem"
+ylab_reslev <- "Resíduo studentizado"
+title_reslev <- ""
+
+# Cook's dist vs Leverage Plot
+xlab_cooklev <- "Influência"
+ylab_cooklev <- "Distância de Cook"
+title_cooklev <- ""
+
+# Collect axis labels and titles in 3 lists    
+xlab_list <- list(resfit = xlab_resfit, cook = xlab_cook, 
+                  reslev = xlab_reslev,
+                  cooklev = xlab_cooklev)
+ylab_list <- list(resfit = ylab_resfit, cook = ylab_cook,
+                  reslev = ylab_reslev,
+                  cooklev = ylab_cooklev)
+title_list <- list(resfit = title_resfit, cook = title_cook, 
+                   reslev = title_reslev,
+                   cooklev = title_cooklev)
+
+# Pass the lists of axis labels and title to myautoplot
+diagnostico(modelo3, which = c(1, 4, 5, 6), xlab = xlab_list, 
+           ylab = ylab_list, 
+           title = title_list)
+```
+
+\mar Com o propósito de identificar as observações influentes, utilizou-se os gráficos da Figura 7. Foi possível identificar que apenas duas observações causam variações desproporcionais em algumas estimativas, porém não interferem em mudanças inferenciais, são as observações de números 4 e 30. 
+
+\mar Identificou-se que a observação de número 30 corresponde a um executivo com salário anual de USD 110 mil, posição 2 com 2,4 anos de experiência. E também que a observação de número 4 é de uma executiva com salário anual de USD 139 mil, posição 7 e 13,9 anos de experiência.
+
+\mar Partindo do modelo ajustado dado pela fórmula em \eqref{eqn:ajus}, tem-se o modelo ajustado para cada sexo.
+
+O modelo ajustado para o grupo de executivas é dado por:
+\begin{equation}
+\hat{y}(\textbf{x}) = 108,042 + 8,096posicao + (0,336 - 0,135posicao) * experiencia
+\end{equation}
+em que $\textbf{x} = (genero, posicao, experiencia)^{T}.$
+
+O modelo ajustado para o grupo de executivos é dado por:
+\begin{equation}
+\hat{y}(\textbf{x}) = 105,231 + 8,096posicao + (0,336 - 0,135posicao) * experiencia
+\end{equation}
+em que $\textbf{x} = (genero, posicao, experiencia)^{T}.$
+
+Qual seria o salário previsto para executivos com 7 anos de experiência e posição 3?
+\begin{itemize}
+\item Executivo: USD 129,036 mil
+\item Executiva: USD 131,847 mil. 
+\end{itemize}
+
+### Conclusões
+
+\mar Quando desprezadas as variáveis Posição e Experiência os salários anuais dos executivos são em média significativamente maiores do que das executivas. No entanto, quando essas variáveis são consideradas pelo modelo ocorre o contrário, para uma mesma posição e mesma experiência as executivas ganham em média mais do que os executivos.
+
+\mar A interação entre Experiência e Posição mostra que a tendência entre o salário médio e o tempo no cargo não é a mesma para todas as posições. Em geral essa interação indica que não vale a pena do ponto de vista salarial ficar muito tempo no mesmo cargo.
+
+
+
+
+
+
+
+
+
+
+
