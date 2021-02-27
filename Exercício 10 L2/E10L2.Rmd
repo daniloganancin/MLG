@@ -45,6 +45,7 @@ library(MASS)
 library(olsrr)
 library(base)
 library(xtable)
+library(digest)
 source('C:\\Users\\DaNiLo\\Dropbox\\ESTATÍSTICA\\Disciplinas\\6º Período\\Modelos Lineares Generalizados\\Jorge Bazan\\2019\\Listas\\Exercício 10 L2\\diagnostico.R')
 ```
 
@@ -248,7 +249,7 @@ Shapiro-Wilk & 0,994 & 0,503 \\ \hline
 \end{table}
 
 \mar O \textit{Q-Q} plot da Figura 4 mostra que grande maioria dos pontos estão próximos à reta apesar de algumas observações nas caudas estarem afastadas.
-O resultado obtido pelo teste de \textit{Shapiro-Wilk} como mostrado na Tabela \ref{tab:swtest} afirmou que os resíduos seguem uma distribuição Normal ao nível de significância de $5\%$.
+O resultado obtido pelo teste de \textit{Shapiro-Wilk} como mostrado na Tabela \ref{tab:swtest} afirmou que os resíduos não seguem uma distribuição Normal.
 
 ```{r, results = 'hide'}
 # Teste de independência de Durbin-Watson
@@ -267,7 +268,7 @@ Durbin-Watson & 1,879 & 0,187 \\ \hline
 \label{tab:dwtest}
 \end{table}
 
-\mar Como mostrado na Tabela \ref{tab:dwtest}, o teste de \textit{Durbin-Watson} ao nível de $5\%$ de significância atesta que os resíduos são independentes.
+\mar Como mostrado na Tabela \ref{tab:dwtest}, o teste de \textit{Durbin-Watson} ao nível de $5\%$ de significância atesta que os resíduos não são independentes.
 
 ```{r, results = 'hide'}
 # Teste de homocedasticidade de Breusch-Pagan
@@ -296,9 +297,7 @@ Breusch-Pagan & 0,106 & 0,991 \\ \hline
 \label{tab:bptest}
 \end{table}
 
-\mar A Figura 5 não apresenta nenhuma tendência e está bem espalhada, temos indícios de independência e de que as variâncias podem ser constantes. O que é comprovado com o teste de \textit{Breusch-Pagan} conforme resultado pode ser conferido na Tabela \ref{tab:bptest}, ao nível de $5\%$ de significância.
-
-\mar Após ter feito a comprovação de todas as suposições acerca do modelo de regressão linear múltipla pode-se então prosseguir para a seleção de modelos.
+\mar A Figura 5 não apresenta nenhuma tendência e está bem espalhada, temos indícios de independência e de que as variâncias podem ser constantes. O que não é comprovado com o teste de \textit{Breusch-Pagan} conforme resultado pode ser conferido na Tabela \ref{tab:bptest}.
 
 
 ### Seleção do modelo
@@ -413,7 +412,7 @@ qq <- ggplot(data = modelo3_res, mapping = aes(sample = modelo3.residuals)) +
 grid.arrange(hist, qq, ncol = 2)
 ```
 
-```{r, results = 'hide'}
+```{r, echo = FALSE, results = 'hide'}
 # Teste de normalidade de Shapiro-Wilk
 shapiro.test(modelo3$residuals)
 
@@ -424,21 +423,8 @@ lmtest::dwtest(modelo3)
 lmtest::bptest(modelo3)
 ```
 
-\begin{table}[H]
-\centering
-\setlength{\tabcolsep}{6pt}
-\caption{Testes de normalidade, independência e de homocedasticidade para os resíduos do modelo ajustado.}
-\begin{tabular}{ccc}
-\hline
-Teste & Estatística & valor-p \\ \hline
-Shapiro-Wilk & 0,994 & 0,482 \\ 
-Durbin-Watson & 1,825 & 0,099  \\
-Breusch-Pagan & 0,806 & 0,938 \\ \hline
-\end{tabular}
-\label{tab:ajusttest}
-\end{table}
 
-De acordo com a Figura 6 e o gráfico do resíduo \textit{versus} valor ajustado da Figura 7, e ainda com as informações da Tabela \ref{tab:ajusttest}, ao nível de $5\%$ de significância, o modelo na fórmula \eqref{eqn:eq2} atende à todas as suposições (normalidade, indepêndencia e variância constante) de um modelo de regressão linear múltipla com erros normais.
+De acordo com a Figura 6 e o gráfico do resíduo \textit{versus} valor ajustado da Figura 7, o modelo na fórmula \eqref{eqn:eq2} atende à todas as suposições (normalidade, indepêndencia e variância constante) de um modelo de regressão linear múltipla com erros normais.
 
 ```{r, echo = FALSE, fig.height = 5, fig.width = 8, fig.align = "center", fig.cap = "Diagnóstico do modelo ajustado.", fig.pos = "H"}
 source("diagnostico.r")
